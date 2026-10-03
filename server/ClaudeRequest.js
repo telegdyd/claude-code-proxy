@@ -5,6 +5,7 @@ const os = require('os');
 const { execSync } = require('child_process');
 const Logger = require('./Logger');
 const OAuthManager = require('./OAuthManager');
+const usageStats = require('./UsageStats');
 
 const STRIP_TTL = true;
 const TOKEN_REFRESH_METHOD = 'OAUTH'; // 'OAUTH' or 'CLAUDE_CODE_CLI'
@@ -45,10 +46,11 @@ class ClaudeRequest {
   static presetCache = new Map();
   static refreshPromise = null;
 
-  constructor(req = null) {
+  constructor(req = null, statsStore = usageStats) {
     this.API_URL = 'https://api.anthropic.com/v1/messages';
     this.VERSION = '2023-06-01';
     this.BETA_HEADER = 'claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14';
+    this.statsStore = statsStore;
 
     const apiKey = req?.headers?.['x-api-key'];
     if (apiKey && apiKey.includes('sk-ant')) {
@@ -442,6 +444,20 @@ class ClaudeRequest {
   }
 
   async handleResponse(res, body, presetName = null) {
+    const requestMetadata = {
+      model: body?.model,
+      streaming: body?.stream === true,
+      timestamp: new Date().toISOString()
+    };
+    let recorded = false;
+    const record = (status, usage = null) => {
+      if (recorded) return;
+      recorded = true;
+      this.statsStore.record({ ...requestMetadata, status, usage }).catch(error => {
+        Logger.warn(`Failed to persist usage statistics: ${error.message}`);
+      });
+    };
+
     try {
       const claudeResponse = await this.makeRequest(body, presetName);
       
@@ -459,7 +475,7 @@ class ClaudeRequest {
           Object.keys(retryResponse.headers).forEach(key => {
             res.setHeader(key, retryResponse.headers[key]);
           });
-          this.streamResponse(res, retryResponse);
+          this.streamResponse(res, retryResponse, record);
           return;
         } catch (error) {
           Logger.info('Token load/refresh failed, passing 401 to client');
@@ -473,16 +489,17 @@ class ClaudeRequest {
         res.setHeader(key, claudeResponse.headers[key]);
       });
       
-      this.streamResponse(res, claudeResponse);
+      this.streamResponse(res, claudeResponse, record);
       
     } catch (error) {
       console.error('Claude request error:', error.message);
+      record(500);
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: error.message }));
     }
   }
 
-  streamResponse(res, claudeResponse) {
+  streamResponse(res, claudeResponse, record = () => {}) {
     const extractClaudeText = (chunk) => {
       try {
         const lines = chunk.toString().split('\n');
@@ -506,16 +523,61 @@ class ClaudeRequest {
 
     const contentType = claudeResponse.headers['content-type'] || '';
     if (contentType.includes('text/event-stream')) {
+      let sseBuffer = '';
+      let collectedUsage = {};
+      const flattenUsage = (usage, prefix = '', fields = {}) => {
+        for (const [key, value] of Object.entries(usage || {})) {
+          const name = prefix ? `${prefix}.${key}` : key;
+          if (value && typeof value === 'object' && !Array.isArray(value)) {
+            flattenUsage(value, name, fields);
+          } else if (key.endsWith('_tokens') && Number.isFinite(value) && value >= 0) {
+            fields[name] = value;
+          }
+        }
+        return fields;
+      };
+      const consumeSseChunk = chunk => {
+        sseBuffer += chunk.toString('utf8');
+        const events = sseBuffer.split(/\r?\n\r?\n/);
+        sseBuffer = events.pop();
+        for (const event of events) {
+          const data = event.split(/\r?\n/)
+            .filter(line => line.startsWith('data:'))
+            .map(line => line.slice(5).trimStart())
+            .join('\n');
+          if (!data || data === '[DONE]') continue;
+          try {
+            const parsed = JSON.parse(data);
+            let usage = null;
+            if (parsed.type === 'message_start') usage = parsed.message?.usage;
+            if (parsed.type === 'message_delta') usage = parsed.usage;
+            if (usage && typeof usage === 'object') {
+              Object.assign(collectedUsage, flattenUsage(usage));
+            }
+          } catch (error) {
+            // Ignore malformed or non-JSON SSE events; the original bytes still pass through.
+          }
+        }
+      };
+      claudeResponse.on('data', consumeSseChunk);
+      claudeResponse.on('end', () => {
+        if (sseBuffer.trim()) consumeSseChunk(Buffer.from('\n\n'));
+        record(claudeResponse.statusCode, Object.keys(collectedUsage).length ? collectedUsage : null);
+      });
       Logger.debug('Outgoing response headers to client:', JSON.stringify(res.getHeaders(), null, 2));
       
       claudeResponse.on('error', (err) => {
         Logger.debug('Claude response stream error:', err);
+        record(502);
         if (!res.headersSent) {
           res.writeHead(500, { 'Content-Type': 'application/json' });
         }
         if (!res.destroyed) {
           res.end(JSON.stringify({ error: 'Upstream response error' }));
         }
+      });
+      claudeResponse.on('close', () => {
+        if (!claudeResponse.readableEnded) record(502);
       });
       
       res.on('close', () => {
@@ -559,6 +621,7 @@ class ClaudeRequest {
 
       claudeResponse.on('error', (err) => {
         Logger.error('Claude non-streaming response error:', err);
+        record(502);
         if (!res.headersSent) {
           res.writeHead(502, { 'Content-Type': 'application/json' });
         }
@@ -566,16 +629,21 @@ class ClaudeRequest {
           res.end(JSON.stringify({ error: 'Upstream error', message: err.message }));
         }
       });
+      claudeResponse.on('close', () => {
+        if (!claudeResponse.readableEnded) record(502);
+      });
 
       claudeResponse.on('end', () => {
         Logger.debug(`Non-streaming response (${claudeResponse.statusCode}): ${responseData.substring(0, 500)}`);
         try {
           const jsonData = JSON.parse(responseData);
+          record(claudeResponse.statusCode, jsonData.usage);
           res.setHeader('Content-Type', 'application/json');
           Logger.debug('Outgoing response headers to client:', JSON.stringify(res.getHeaders(), null, 2));
           res.end(JSON.stringify(jsonData));
           Logger.debug('Non-streaming response sent back to client');
         } catch (e) {
+          record(claudeResponse.statusCode);
           res.end(responseData);
           Logger.debug('Raw response sent back to client');
         }

@@ -5,6 +5,7 @@ const path = require('path');
 const ClaudeRequest = require('./ClaudeRequest');
 const Logger = require('./Logger');
 const OAuthManager = require('./OAuthManager');
+const usageStats = require('./UsageStats');
 const { exec } = require('child_process');
 
 let config = {};
@@ -23,7 +24,8 @@ function cleanupExpiredPKCE() {
 }
 
 // Cleanup expired PKCE states every minute
-setInterval(cleanupExpiredPKCE, 60000);
+const pkceCleanupTimer = setInterval(cleanupExpiredPKCE, 60000);
+pkceCleanupTimer.unref();
 
 function loadConfig() {
   try {
@@ -118,7 +120,7 @@ function isRunningInDocker() {
   }
 }
 
-async function handleRequest(req, res) {
+async function handleRequest(req, res, statsStore = usageStats) {
   const clientIP = getClientIP(req);
   const parsedUrl = url.parse(req.url, true);
   const pathname = parsedUrl.pathname;
@@ -132,6 +134,89 @@ async function handleRequest(req, res) {
   if (req.method === 'OPTIONS') {
     res.writeHead(200);
     res.end();
+    return;
+  }
+
+  if (pathname === '/stats') {
+    if (req.method !== 'GET') {
+      res.writeHead(405, { 'Content-Type': 'application/json', 'Allow': 'GET' });
+      res.end(JSON.stringify({ error: 'Method not allowed' }));
+      return;
+    }
+    serveStaticFile(res, 'stats.html', 'text/html; charset=utf-8');
+    return;
+  }
+
+  if (pathname === '/api/stats/settings') {
+    if (req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ enabled: statsStore.enabled }));
+      return;
+    }
+    if (req.method !== 'PUT') {
+      res.writeHead(405, { 'Content-Type': 'application/json', 'Allow': 'GET, PUT' });
+      res.end(JSON.stringify({ error: 'Method not allowed' }));
+      return;
+    }
+    try {
+      const payload = await parseBody(req);
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload) || typeof payload.enabled !== 'boolean' || Object.keys(payload).length !== 1) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Payload must contain only a boolean enabled field' }));
+        return;
+      }
+      const state = await statsStore.setEnabled(payload.enabled);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(state));
+    } catch (error) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: error.message }));
+    }
+    return;
+  }
+
+  if (pathname === '/api/stats/history') {
+    if (req.method !== 'DELETE') {
+      res.writeHead(405, { 'Content-Type': 'application/json', 'Allow': 'DELETE' });
+      res.end(JSON.stringify({ error: 'Method not allowed' }));
+      return;
+    }
+    try {
+      const result = await statsStore.clearHistory();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (error) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Failed to clear request history' }));
+    }
+    return;
+  }
+
+  if (pathname === '/api/stats') {
+    if (req.method === 'DELETE') {
+      try {
+        const result = await statsStore.reset();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Failed to reset statistics' }));
+      }
+      return;
+    }
+    if (req.method !== 'GET') {
+      res.writeHead(405, { 'Content-Type': 'application/json', 'Allow': 'GET, DELETE' });
+      res.end(JSON.stringify({ error: 'Method not allowed' }));
+      return;
+    }
+    const range = parsedUrl.query.range || 'all';
+    if (!['24h', '7d', '30d', 'all'].includes(range)) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'range must be 24h, 7d, 30d, or all' }));
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(statsStore.getStats(range)));
     return;
   }
 
@@ -257,6 +342,7 @@ async function handleRequest(req, res) {
   }
   
   if (req.method === 'POST' && (pathname === '/v1/messages' || pathname.match(/^\/v1\/\w+\/messages$/))) {
+    let requestStarted = false;
     try {
       Logger.debug('Incoming request headers:', JSON.stringify(req.headers, null, 2));
       const body = await parseBody(req);
@@ -269,8 +355,14 @@ async function handleRequest(req, res) {
         Logger.debug(`Detected preset: ${presetName}`);
       }
       
-      await new ClaudeRequest(req).handleResponse(res, body, presetName);
+      requestStarted = true;
+      await new ClaudeRequest(req, statsStore).handleResponse(res, body, presetName);
     } catch (error) {
+      if (!requestStarted) {
+        statsStore.record({ model: 'unknown', status: 500, streaming: false }).catch(statsError => {
+          Logger.warn(`Failed to persist usage statistics: ${statsError.message}`);
+        });
+      }
       Logger.error('Request error:', error.message);
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: error.message }));
@@ -333,4 +425,4 @@ if (require.main === module) {
   startServer();
 }
 
-module.exports = { startServer, ClaudeRequest };
+module.exports = { startServer, handleRequest, ClaudeRequest };
