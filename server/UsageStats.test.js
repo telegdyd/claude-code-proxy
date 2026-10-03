@@ -140,6 +140,10 @@ describe('production usage dashboard routes', () => {
     const page = await request(server).get('/stats');
     expect(page.status).toBe(200);
     expect(page.text).toContain('Usage, at a glance.');
+    expect(page.text).toContain('id="bucket"');
+    expect(page.text).toContain('id="theme-toggle"');
+    expect(page.text).toContain('Cached input');
+    expect(page.text).toContain('setInterval(() =>');
     const dashboardScript = page.text.match(/<script>([\s\S]*?)<\/script>/);
     expect(() => new Function(dashboardScript[1])).not.toThrow();
 

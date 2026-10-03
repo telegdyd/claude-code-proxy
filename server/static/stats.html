@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="color-scheme" content="light">
+  <meta name="color-scheme" content="light dark">
   <title>Usage Statistics | Claude Code Proxy</title>
   <style>
     :root {
@@ -18,7 +18,58 @@
       --orange: #c97848;
       --blue: #6285a0;
       --red: #b74f47;
+      --control-bg: #fff;
+      --control-hover: #f8faf7;
+      --control-border-hover: #bdc8ba;
+      --focus: #9eb9a3;
+      --switch-track: #c8cbc5;
+      --error-bg: #fff0ee;
+      --error-ink: #873c36;
+      --error-border: #dfb9b5;
+      --error-hover: #fff8f7;
+      --info-bg: #edf4eb;
+      --info-ink: #38583e;
+      --bar-track: #eff0eb;
+      --table-head: #fafaf7;
+      --table-row-line: #efefe9;
+      --chart-grid: #eceee8;
+      --chart-label: #747a71;
+      --series-input: #426d51;
+      --series-output: #c97848;
+      --series-cache: #6285a0;
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --ink: #e6e9e2;
+      --muted: #a3aa9f;
+      --line: #394039;
+      --paper: #171b18;
+      --panel: #222823;
+      --green: #9fc4a4;
+      --green-soft: #2b3a2e;
+      --orange: #e5a176;
+      --blue: #8db4d0;
+      --red: #ee9188;
+      --control-bg: #282f2a;
+      --control-hover: #303a33;
+      --control-border-hover: #637466;
+      --focus: #789b7d;
+      --switch-track: #586158;
+      --error-bg: #472b29;
+      --error-ink: #ffc0b8;
+      --error-border: #76504b;
+      --error-hover: #50312e;
+      --info-bg: #29392c;
+      --info-ink: #c4e2c7;
+      --bar-track: #394039;
+      --table-head: #282f2a;
+      --table-row-line: #394039;
+      --chart-grid: #394039;
+      --chart-label: #a3aa9f;
+      --series-input: #9fc4a4;
+      --series-output: #e5a176;
+      --series-cache: #8db4d0;
     }
     * { box-sizing: border-box; }
     body { margin: 0; background: var(--paper); color: var(--ink); }
@@ -33,23 +84,23 @@
     .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 14px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; margin-bottom: 16px; }
     .toolbar-left, .toolbar-right { display: flex; align-items: center; gap: 14px; }
     .toolbar label { color: var(--muted); font-size: 12px; font-weight: 650; }
-    select, .button { min-height: 37px; padding: 7px 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); }
+    select, .button { min-height: 37px; padding: 7px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--control-bg); color: var(--ink); }
     .button { cursor: pointer; font-size: 12px; font-weight: 650; }
-    .button:hover { border-color: #bdc8ba; background: #f8faf7; }
+    .button:hover { border-color: var(--control-border-hover); background: var(--control-hover); }
     .button.danger { color: var(--red); }
-    .button.danger:hover { border-color: #dfb9b5; background: #fff8f7; }
+    .button.danger:hover { border-color: var(--error-border); background: var(--error-hover); }
     .switch { display: inline-flex; align-items: center; gap: 9px; cursor: pointer; font-size: 13px; font-weight: 650; }
     .switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
-    .track { width: 36px; height: 21px; border-radius: 99px; background: #c8cbc5; padding: 3px; transition: background .18s; }
-    .track::after { content: ""; display: block; width: 15px; height: 15px; border-radius: 50%; background: #fff; transition: transform .18s; }
+    .track { width: 36px; height: 21px; border-radius: 99px; background: var(--switch-track); padding: 3px; transition: background .18s; }
+    .track::after { content: ""; display: block; width: 15px; height: 15px; border-radius: 50%; background: var(--control-bg); transition: transform .18s; }
     .switch input:checked + .track { background: var(--green); }
     .switch input:checked + .track::after { transform: translateX(15px); }
-    .switch input:focus-visible + .track { outline: 3px solid #9eb9a3; outline-offset: 2px; }
+    .switch input:focus-visible + .track { outline: 3px solid var(--focus); outline-offset: 2px; }
     .state-note { color: var(--muted); font-size: 11px; }
     .notice { display: none; padding: 11px 14px; margin: 0 0 16px; border-radius: 7px; font-size: 13px; }
     .notice.visible { display: block; }
-    .notice.error { background: #fff0ee; color: #873c36; }
-    .notice.info { background: #edf4eb; color: #38583e; }
+    .notice.error { background: var(--error-bg); color: var(--error-ink); }
+    .notice.info { background: var(--info-bg); color: var(--info-ink); }
     .cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
     .card, .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
     .card { padding: 18px 19px 16px; min-height: 116px; }
@@ -73,7 +124,7 @@
     .model-top { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; }
     .model-name { font-weight: 650; overflow-wrap: anywhere; }
     .model-count { color: var(--muted); white-space: nowrap; }
-    .bar { height: 5px; margin: 8px 0 6px; border-radius: 99px; background: #eff0eb; overflow: hidden; }
+    .bar { height: 5px; margin: 8px 0 6px; border-radius: 99px; background: var(--bar-track); overflow: hidden; }
     .bar > i { display: block; height: 100%; border-radius: inherit; background: var(--green); }
     .model-detail { color: var(--muted); font-size: 10px; }
     .model-empty { color: var(--muted); font-size: 13px; }
@@ -85,15 +136,19 @@
     .history .panel-heading { padding: 20px 20px 0; }
     .table-scroll { overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; min-width: 690px; font-size: 12px; }
-    th { padding: 11px 14px; color: var(--muted); background: #fafaf7; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; }
-    td { padding: 12px 14px; border-top: 1px solid #efefe9; vertical-align: middle; }
+    th { padding: 11px 14px; color: var(--muted); background: var(--table-head); text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; }
+    td { padding: 12px 14px; border-top: 1px solid var(--table-row-line); vertical-align: middle; }
     td:first-child, th:first-child { padding-left: 20px; }
     .status { display: inline-block; min-width: 36px; padding: 4px 6px; text-align: center; border-radius: 4px; background: var(--green-soft); color: var(--green); font-size: 10px; font-weight: 750; }
-    .status.bad { background: #fff0ee; color: var(--red); }
+    .status.bad { background: var(--error-bg); color: var(--red); }
     .mode { color: var(--muted); }
     .token-cell { font-variant-numeric: tabular-nums; white-space: nowrap; }
     .empty-row { padding: 34px 14px; }
     .footer-note { margin-top: 15px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+    @media (max-width: 1050px) {
+      .toolbar { align-items: flex-start; flex-direction: column; }
+      .toolbar-left, .toolbar-right { width: 100%; flex-wrap: wrap; }
+    }
     @media (max-width: 850px) {
       .content-grid { grid-template-columns: 1fr; }
       .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -138,6 +193,12 @@
           <option value="30d">30 days</option>
           <option value="all" selected>All time</option>
         </select>
+        <label for="bucket">Chart interval</label>
+        <select id="bucket">
+          <option value="hour">Hourly</option>
+          <option value="day" selected>Daily</option>
+          <option value="week">Weekly</option>
+        </select>
         <label class="switch" for="collection">
           <input id="collection" type="checkbox">
           <span class="track" aria-hidden="true"></span>
@@ -146,6 +207,11 @@
         <span id="collection-note" class="state-note">Loading collection state</span>
       </div>
       <div class="toolbar-right">
+        <label class="switch" for="theme-toggle">
+          <input id="theme-toggle" type="checkbox" aria-label="Use dark theme">
+          <span class="track" aria-hidden="true"></span>
+          <span>Dark theme</span>
+        </label>
         <button id="clear-history" class="button danger" type="button">Clear request history</button>
         <button id="reset-stats" class="button danger" type="button">Reset all statistics</button>
       </div>
@@ -163,12 +229,12 @@
 
       <section class="content-grid">
         <article class="panel">
-          <div class="panel-heading"><h2>Token flow</h2><span class="panel-caption">Reported hourly totals, combined by model</span></div>
+          <div class="panel-heading"><h2>Token flow</h2><span id="chart-caption" class="panel-caption">Daily totals for selected period (UTC)</span></div>
           <div class="chart-wrap">
             <svg id="usage-chart" viewBox="0 0 720 230" role="img" aria-label="Token usage over time"></svg>
             <div id="chart-empty" class="chart-empty">No token usage in this period.</div>
           </div>
-          <div class="legend"><span><i class="swatch" style="background:var(--green)"></i>Input context</span><span><i class="swatch" style="background:var(--orange)"></i>Output</span></div>
+          <div class="legend"><span><i class="swatch" style="background:var(--series-input)"></i>Input</span><span><i class="swatch" style="background:var(--series-output)"></i>Output</span><span><i class="swatch" style="background:var(--series-cache)"></i>Cached input</span></div>
         </article>
         <article class="panel">
           <div class="panel-heading"><h2>By model</h2><span class="panel-caption">Selected period</span></div>
@@ -196,16 +262,33 @@
   <script>
     const $ = id => document.getElementById(id);
     const number = value => new Intl.NumberFormat().format(value);
+    let preferredTheme;
+    try { preferredTheme = localStorage.getItem('stats-theme'); } catch {}
+    const initialTheme = preferredTheme === 'light' || preferredTheme === 'dark'
+      ? preferredTheme
+      : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.dataset.theme = initialTheme;
+    $('theme-toggle').checked = initialTheme === 'dark';
+    let lastData = null;
+    const setTheme = (theme, persist = false) => {
+      document.documentElement.dataset.theme = theme;
+      $('theme-toggle').checked = theme === 'dark';
+      if (persist) {
+        try { localStorage.setItem('stats-theme', theme); } catch {}
+      }
+      if (lastData) drawChart(lastData.rollups || []);
+    };
     const sumInput = usage => {
       const keys = ['input_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens'];
       return keys.every(key => Number.isFinite(usage?.[key])) ? keys.reduce((sum, key) => sum + usage[key], 0) : null;
     };
     const token = value => Number.isFinite(value) ? number(value) : '-';
-    const showNotice = (message, error = false) => {
+    const showNotice = (message, error = false, kind = error ? 'action-error' : 'action') => {
       $('notice').textContent = message;
       $('notice').className = `notice visible ${error ? 'error' : 'info'}`;
+      $('notice').dataset.kind = kind;
     };
-    const hideNotice = () => { $('notice').className = 'notice'; };
+    const hideNotice = () => { $('notice').className = 'notice'; delete $('notice').dataset.kind; };
     const svgElement = (name, attributes = {}) => {
       const node = document.createElementNS('http://www.w3.org/2000/svg', name);
       for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, value);
@@ -215,46 +298,86 @@
     function drawChart(rollups) {
       const svg = $('usage-chart');
       svg.replaceChildren();
+      const interval = $('bucket').value;
       const buckets = new Map();
       for (const item of rollups) {
-        const point = buckets.get(item.hour) || { hour: item.hour, usage: {} };
-        for (const [key, value] of Object.entries(item.usage || {})) {
-          if (Number.isFinite(value)) point.usage[key] = (point.usage[key] || 0) + value;
-        }
-        buckets.set(item.hour, point);
+        const timestamp = new Date(item.hour).getTime();
+        if (!Number.isFinite(timestamp)) continue;
+        const date = new Date(timestamp);
+        if (interval !== 'hour') date.setUTCHours(0, 0, 0, 0);
+        if (interval === 'week') date.setUTCDate(date.getUTCDate() - (date.getUTCDay() + 6) % 7);
+        const key = interval === 'hour' ? timestamp : date.getTime();
+        const point = buckets.get(key) || { start: key, input: 0, output: 0, cache: 0, reported: false };
+        const usage = item.usage || {};
+        const input = usage.input_tokens;
+        const output = usage.output_tokens;
+        const cacheRead = usage.cache_read_input_tokens;
+        const cacheWrite = usage.cache_creation_input_tokens;
+        point.reported ||= [input, output, cacheRead, cacheWrite].some(Number.isFinite);
+        if (Number.isFinite(input)) point.input += input;
+        if (Number.isFinite(output)) point.output += output;
+        if (Number.isFinite(cacheRead)) point.cache += cacheRead;
+        if (Number.isFinite(cacheWrite)) point.cache += cacheWrite;
+        buckets.set(key, point);
       }
-      const points = [...buckets.values()].map(point => ({
-        hour: point.hour,
-        input: sumInput(point.usage),
-        output: Number.isFinite(point.usage.output_tokens) ? point.usage.output_tokens : null
-      })).filter(point => point.input !== null || point.output !== null);
-      $('chart-empty').classList.toggle('visible', points.length === 0);
-      svg.style.display = points.length ? 'block' : 'none';
-      if (!points.length) return;
+      const points = [...buckets.values()].sort((a, b) => a.start - b.start);
+      const hasData = points.some(point => point.reported);
+      $('chart-empty').classList.toggle('visible', !hasData);
+      svg.style.display = hasData ? 'block' : 'none';
+      $('chart-caption').textContent = `${interval === 'hour' ? 'Hourly' : interval === 'day' ? 'Daily' : 'Weekly'} bucket totals for selected range (UTC)`;
+      if (!hasData) return;
 
-      const width = 720, height = 230, left = 44, right = 12, top = 12, bottom = 30;
-      const max = Math.max(1, ...points.flatMap(point => [point.input || 0, point.output || 0]));
-      const x = index => left + (points.length === 1 ? (width - left - right) / 2 : index * (width - left - right) / (points.length - 1));
-      const y = value => height - bottom - (value / max) * (height - top - bottom);
-      for (let tick = 0; tick <= 2; tick++) {
-        const value = max * tick / 2;
+      const plotted = points;
+      const width = 720, height = 230, left = 48, right = 12, top = 12, bottom = 32;
+      const plotWidth = width - left - right;
+      const plotHeight = height - top - bottom;
+      const max = Math.max(1, ...plotted.map(point => point.input + point.output + point.cache));
+      const step = plotWidth / plotted.length;
+      const x = index => left + (index + 0.5) * step;
+      const y = value => height - bottom - (value / max) * plotHeight;
+      const colors = getComputedStyle(document.documentElement);
+      const series = [
+        ['input', colors.getPropertyValue('--series-input').trim()],
+        ['output', colors.getPropertyValue('--series-output').trim()],
+        ['cache', colors.getPropertyValue('--series-cache').trim()]
+      ];
+      for (let tick = 0; tick <= 3; tick++) {
+        const value = max * tick / 3;
         const yy = y(value);
-        svg.append(svgElement('line', { x1: left, x2: width - right, y1: yy, y2: yy, stroke: '#eceee8', 'stroke-width': 1 }));
-        const label = svgElement('text', { x: left - 7, y: yy + 4, fill: '#8b9088', 'font-size': 10, 'text-anchor': 'end' });
+        svg.append(svgElement('line', { x1: left, x2: width - right, y1: yy, y2: yy, stroke: colors.getPropertyValue('--chart-grid').trim(), 'stroke-width': 1 }));
+        const label = svgElement('text', { x: left - 7, y: yy + 4, fill: colors.getPropertyValue('--chart-label').trim(), 'font-size': 10, 'text-anchor': 'end' });
         label.textContent = number(Math.round(value));
         svg.append(label);
       }
-      for (const [field, color] of [['input', '#426d51'], ['output', '#c97848']]) {
-        const available = points.map((point, index) => ({ point, index })).filter(item => item.point[field] !== null);
-        if (!available.length) continue;
-        const path = available.map((item, index) => `${index ? 'L' : 'M'} ${x(item.index)} ${y(item.point[field])}`).join(' ');
-        svg.append(svgElement('path', { d: path, fill: 'none', stroke: color, 'stroke-width': 2.5, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
-        for (const item of available) svg.append(svgElement('circle', { cx: x(item.index), cy: y(item.point[field]), r: 3, fill: color }));
-      }
-      const first = new Date(points[0].hour), last = new Date(points[points.length - 1].hour);
-      for (const [position, date] of [[left, first], [width - right, last]]) {
-        const label = svgElement('text', { x: position, y: height - 6, fill: '#8b9088', 'font-size': 10, 'text-anchor': position === left ? 'start' : 'end' });
-        label.textContent = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      const barWidth = Math.max(0.5, Math.min(22, step * 0.68));
+      plotted.forEach((point, index) => {
+        let base = 0;
+        for (const [field, color] of series) {
+          const value = point[field];
+          if (value > 0) {
+            const topY = y(base + value);
+            const bottomY = y(base);
+            svg.append(svgElement('rect', {
+              x: x(index) - barWidth / 2, y: topY, width: barWidth, height: Math.max(0.5, bottomY - topY),
+              rx: Math.min(2, barWidth / 4), fill: color
+            }));
+          }
+          base += value;
+        }
+      });
+      const dateOptions = interval === 'hour'
+        ? { month: 'short', day: 'numeric', hour: '2-digit', hour12: false, timeZone: 'UTC' }
+        : { month: 'short', day: 'numeric', timeZone: 'UTC' };
+      const labelCount = Math.min(5, plotted.length);
+      const usedIndices = new Set(Array.from({ length: labelCount }, (_, index) => Math.round(index * (plotted.length - 1) / Math.max(1, labelCount - 1))));
+      for (const index of usedIndices) {
+        const point = plotted[index];
+        const position = x(index);
+        const label = svgElement('text', {
+          x: position, y: height - 6, fill: colors.getPropertyValue('--chart-label').trim(),
+          'font-size': 10, 'text-anchor': index === 0 ? 'start' : index === plotted.length - 1 ? 'end' : 'middle'
+        });
+        label.textContent = new Intl.DateTimeFormat(undefined, dateOptions).format(new Date(point.start));
         svg.append(label);
       }
     }
@@ -335,6 +458,7 @@
     }
 
     function render(data) {
+      lastData = data;
       const summary = data.summary;
       const usage = summary.usage || {};
       const input = sumInput(usage);
@@ -372,26 +496,51 @@
       $('dashboard').hidden = false;
     }
 
-    async function loadData() {
-      hideNotice();
-      try {
-        const [statsResponse, settingsResponse] = await Promise.all([
-          fetch(`/api/stats?range=${encodeURIComponent($('range').value)}`),
-          fetch('/api/stats/settings')
-        ]);
-        if (!statsResponse.ok || !settingsResponse.ok) throw new Error('The proxy rejected the statistics request.');
-        const [data, settings] = await Promise.all([statsResponse.json(), settingsResponse.json()]);
-        $('collection').checked = settings.enabled;
-        $('collection-note').textContent = settings.enabled ? 'New usage is being recorded' : 'Collection is paused';
-        render(data);
-      } catch (error) {
-        $('loading').hidden = false;
-        $('loading').innerHTML = '<p class="chart-empty visible">Statistics could not be loaded.</p>';
-        showNotice(error.message, true);
+    let refreshInFlight = false;
+    let refreshQueued = false;
+    async function loadData(queueIfBusy = true) {
+      if (document.hidden) return;
+      if (refreshInFlight) {
+        if (queueIfBusy) refreshQueued = true;
+        return;
       }
+      refreshInFlight = true;
+      do {
+        refreshQueued = false;
+        const range = $('range').value;
+        try {
+          const [statsResponse, settingsResponse] = await Promise.all([
+            fetch(`/api/stats?range=${encodeURIComponent(range)}`),
+            fetch('/api/stats/settings')
+          ]);
+          if (!statsResponse.ok || !settingsResponse.ok) throw new Error('The proxy rejected the statistics request.');
+          const [data, settings] = await Promise.all([statsResponse.json(), settingsResponse.json()]);
+          if (range !== $('range').value) {
+            refreshQueued = true;
+            continue;
+          }
+          if (!$('collection').disabled) {
+            $('collection').checked = settings.enabled;
+            $('collection-note').textContent = settings.enabled ? 'New usage is being recorded' : 'Collection is paused';
+          }
+          render(data);
+          if ($('notice').dataset.kind === 'refresh-error') hideNotice();
+        } catch (error) {
+          if (!lastData) {
+            $('loading').hidden = false;
+            $('loading').innerHTML = '<p class="chart-empty visible">Statistics could not be loaded.</p>';
+          }
+          if (!['action', 'action-error'].includes($('notice').dataset.kind)) {
+            showNotice(error.message || 'Statistics could not be refreshed.', true, 'refresh-error');
+          }
+        }
+      } while (refreshQueued && !document.hidden);
+      refreshInFlight = false;
     }
 
-    $('range').addEventListener('change', loadData);
+    $('range').addEventListener('change', () => loadData());
+    $('bucket').addEventListener('change', () => { if (lastData) drawChart(lastData.rollups || []); });
+    $('theme-toggle').addEventListener('change', event => setTheme(event.currentTarget.checked ? 'dark' : 'light', true));
     $('collection').addEventListener('change', async event => {
       const checkbox = event.currentTarget;
       checkbox.disabled = true;
@@ -426,6 +575,12 @@
       loadData();
     });
     loadData();
+    window.setInterval(() => {
+      if (!document.hidden) loadData(false);
+    }, 30000);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) loadData();
+    });
   </script>
 </body>
 </html>
